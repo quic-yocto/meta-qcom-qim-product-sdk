@@ -1,0 +1,248 @@
+From 106be21fcb491e809f3370c304a26f4240b6c9e8 Mon Sep 17 00:00:00 2001
+From: Amrutha Sai Gattu <agattu@codeaurora.org>
+Date: Fri, 1 Nov 2019 09:56:20 +0530
+Subject: [PATCH] waylandsink: support scaler protocol
+
+Signed-off-by: Amrutha Sai Gattu <quic_agattu@quicinc.com>
+---
+ ext/wayland/meson.build   | 12 +++-
+ ext/wayland/wldisplay.c   | 19 ++++++-
+ ext/wayland/wldisplay.h   |  6 ++
+ ext/wayland/wlwindow.c    | 55 ++++++++++++++++---
+ ext/wayland/wlwindow.h    | 10 +++-
+ 5 files changed, 89 insertions(+), 13 deletions(-)
+
+diff --git a/ext/wayland/meson.build b/ext/wayland/meson.build
+index a3ffb70d84..0ec0199ddc 100644
+--- a/ext/wayland/meson.build
++++ b/ext/wayland/meson.build
+@@ -23,6 +23,16 @@ if use_wayland
+     ]
+     protocols_files = []
+ 
++    fsmod = import('fs')
++    wayland_cargs = []
++
++    if fsmod.exists(protocols_datadir / 'stable/scaler/scaler.xml')
++        protocol_defs += [
++            ['/stable/scaler/scaler.xml', 'scaler-protocol.c', 'scaler-client-protocol.h']
++        ]
++        wayland_cargs += ['-DHAVE_SCALER_PROTOCOL_H']
++    endif
++
+     foreach protodef: protocol_defs
+         xmlfile = protocols_datadir + protodef.get(0)
+ 
+@@ -39,7 +49,7 @@ if use_wayland
+ 
+     gstwaylandsink = library('gstwaylandsink',
+         wl_sources + protocols_files,
+-        c_args : gst_plugins_bad_args + ['-DGST_USE_UNSTABLE_API'],
++        c_args : gst_plugins_bad_args + wayland_cargs + ['-DGST_USE_UNSTABLE_API'],
+         include_directories : [configinc],
+         dependencies : [gst_dep, gstvideo_dep, gstwayland_dep, gstallocators_dep,
+                         wl_client_dep, wl_protocol_dep, libdrm_dep],
+diff --git a/ext/wayland/wldisplay.c b/ext/wayland/wldisplay.c
+index f326091990..0e6264260d 100644
+--- a/ext/wayland/wldisplay.c
++++ b/ext/wayland/wldisplay.c
+@@ -87,6 +87,11 @@ gst_wl_display_finalize (GObject * gobject)
+   if (self->viewporter)
+     wp_viewporter_destroy (self->viewporter);
+ 
++#ifdef HAVE_SCALER_PROTOCOL_H
++  if (self->scaler)
++    wl_scaler_destroy (self->scaler);
++#endif /* HAVE_SCALER_PROTOCOL_H */
++
+   if (self->shm)
+     wl_shm_destroy (self->shm);
+ 
+@@ -233,6 +238,11 @@ registry_handle_global (void *data, struct wl_registry *registry,
+   } else if (g_strcmp0 (interface, "wp_viewporter") == 0) {
+     self->viewporter =
+         wl_registry_bind (registry, id, &wp_viewporter_interface, 1);
++#ifdef HAVE_SCALER_PROTOCOL_H
++  } else if (g_strcmp0(interface, "wl_scaler") == 0) {
++    self->scaler =
++        wl_registry_bind (registry, id, &wl_scaler_interface, MIN (version, 2));
++#endif /* HAVE_SCALER_PROTOCOL_H */
+   } else if (g_strcmp0 (interface, "zwp_linux_dmabuf_v1") == 0) {
+     self->dmabuf =
+         wl_registry_bind (registry, id, &zwp_linux_dmabuf_v1_interface, 1);
+@@ -356,8 +366,15 @@ gst_wl_display_new_existing (struct wl_display * display,
+    * compositor that don't implement this extension. */
+   if (!self->viewporter) {
+     g_warning ("Wayland compositor is missing the ability to scale, video "
+-        "display may not work properly.");
++        "display may not work properly. - No viewporter present");
++  }
++
++#ifdef HAVE_SCALER_PROTOCOL_H
++  if (!self->scaler) {
++    g_warning ("Wayland compositor is missing the ability to scale, video "
++        "display may not work properly - No scaler present");
+   }
++#endif /* HAVE_SCALER_PROTOCOL_H */
+ 
+   if (!self->dmabuf) {
+     g_warning ("Could not bind to zwp_linux_dmabuf_v1");
+diff --git a/ext/wayland/wldisplay.h b/ext/wayland/wldisplay.h
+index f2025a6a03..9c82e179aa 100644
+--- a/ext/wayland/wldisplay.h
++++ b/ext/wayland/wldisplay.h
+@@ -28,6 +28,9 @@
+ #include "viewporter-client-protocol.h"
+ #include "linux-dmabuf-unstable-v1-client-protocol.h"
+ #include "fullscreen-shell-unstable-v1-client-protocol.h"
++#ifdef HAVE_SCALER_PROTOCOL_H
++#include "scaler-client-protocol.h"
++#endif /* HAVE_SCALER_PROTOCOL_H */
+ 
+ G_BEGIN_DECLS
+ 
+@@ -59,6 +62,9 @@ struct _GstWlDisplay
+   struct zwp_fullscreen_shell_v1 *fullscreen_shell;
+   struct wl_shm *shm;
+   struct wp_viewporter *viewporter;
++#ifdef HAVE_SCALER_PROTOCOL_H
++  struct wl_scaler *scaler;
++#endif /* HAVE_SCALER_PROTOCOL_H */
+   struct zwp_linux_dmabuf_v1 *dmabuf;
+   GArray *shm_formats;
+   GArray *dmabuf_formats;
+diff --git a/ext/wayland/wlwindow.c b/ext/wayland/wlwindow.c
+index 57bc6daf1c..2e0765f671 100644
+--- a/ext/wayland/wlwindow.c
++++ b/ext/wayland/wlwindow.c
+@@ -167,8 +167,13 @@ gst_wl_window_finalize (GObject * gobject)
+   if (self->xdg_surface)
+     xdg_surface_destroy (self->xdg_surface);
+ 
+-  if (self->video_viewport)
+-    wp_viewport_destroy (self->video_viewport);
++  if (self->wp_video_viewport)
++    wp_viewport_destroy (self->wp_video_viewport);
++
++#ifdef HAVE_SCALER_PROTOCOL_H
++  if (self->wl_video_viewport)
++    wl_viewport_destroy (self->wl_video_viewport);
++#endif /* HAVE_SCALER_PROTOCOL_H */
+ 
+   wl_proxy_wrapper_destroy (self->video_surface_wrapper);
+   wl_subsurface_destroy (self->video_subsurface);
+@@ -177,8 +182,13 @@ gst_wl_window_finalize (GObject * gobject)
+   if (self->area_subsurface)
+     wl_subsurface_destroy (self->area_subsurface);
+ 
+-  if (self->area_viewport)
+-    wp_viewport_destroy (self->area_viewport);
++  if (self->wp_area_viewport)
++    wp_viewport_destroy (self->wp_area_viewport);
++
++#ifdef HAVE_SCALER_PROTOCOL_H
++  if (self->wl_area_viewport)
++    wl_viewport_destroy (self->wl_area_viewport);
++#endif /* HAVE_SCALER_PROTOCOL_H */
+ 
+   wl_proxy_wrapper_destroy (self->area_surface_wrapper);
+   wl_surface_destroy (self->area_surface);
+@@ -218,10 +228,17 @@ gst_wl_window_new_internal (GstWlDisplay * display, GMutex * render_lock)
+   wl_subsurface_set_desync (window->video_subsurface);
+ 
+   if (display->viewporter) {
+-    window->area_viewport = wp_viewporter_get_viewport (display->viewporter,
++    window->wp_area_viewport = wp_viewporter_get_viewport (display->viewporter,
+         window->area_surface);
+-    window->video_viewport = wp_viewporter_get_viewport (display->viewporter,
++    window->wp_video_viewport = wp_viewporter_get_viewport (display->viewporter,
+         window->video_surface);
++#ifdef HAVE_SCALER_PROTOCOL_H
++  } else if (display->scaler) {
++    window->wl_area_viewport = wl_scaler_get_viewport (display->scaler,
++         window->area_surface);
++    window->wl_video_viewport = wl_scaler_get_viewport (display->scaler,
++         window->video_surface);
++#endif /* HAVE_SCALER_PROTOCOL_H */
+   }
+ 
+   /* never accept input events on the video surface */
+@@ -437,9 +454,14 @@ gst_wl_window_resize_video_surface (GstWlWindow * window, gboolean commit)
+   dst.w = window->render_rectangle.w;
+   dst.h = window->render_rectangle.h;
+ 
+-  if (window->video_viewport) {
++  if (window->wp_video_viewport) {
++    gst_video_sink_center_rect (src, dst, &res, TRUE);
++    wp_viewport_set_destination (window->wp_video_viewport, res.w, res.h);
++#ifdef HAVE_SCALER_PROTOCOL_H
++  } else if (window->wl_video_viewport) {
+     gst_video_sink_center_rect (src, dst, &res, TRUE);
+-    wp_viewport_set_destination (window->video_viewport, res.w, res.h);
++    wl_viewport_set_destination (window->wl_video_viewport, res.w, res.h);
++#endif /* HAVE_SCALER_PROTOCOL_H */
+   } else {
+     gst_video_sink_center_rect (src, dst, &res, FALSE);
+   }
+@@ -531,7 +553,7 @@ gst_wl_window_update_borders (GstWlWindow * window)
+   GstAllocator *alloc;
+ 
+   if (window->display->viewporter) {
+-    wp_viewport_set_destination (window->area_viewport,
++    wp_viewport_set_destination (window->wp_area_viewport,
+         window->render_rectangle.w, window->render_rectangle.h);
+ 
+     if (window->is_area_surface_mapped) {
+@@ -539,10 +561,25 @@ gst_wl_window_update_borders (GstWlWindow * window)
+        * We don't need to attach a new buffer and are done here. */
+       return;
+     }
++#ifdef HAVE_SCALER_PROTOCOL_H
++  } else if (window->display->scaler) {
++    wp_viewport_set_destination (window->wl_area_viewport,
++        window->render_rectangle.w, window->render_rectangle.h);
++
++    if (window->is_area_surface_mapped) {
++      /* The area_surface is already visible and only needed to get resized.
++       * We don't need to attach a new buffer and are done here. */
++      return;
++    }
++#endif /* HAVE_SCALER_PROTOCOL_H */
+   }
+ 
+   if (window->display->viewporter) {
+     width = height = 1;
++#ifdef HAVE_SCALER_PROTOCOL_H
++  } else if (window->display->scaler) {
++    width = height = 1;
++#endif /* HAVE_SCALER_PROTOCOL_H */
+   } else {
+     width = window->render_rectangle.w;
+     height = window->render_rectangle.h;
+diff --git a/ext/wayland/wlwindow.h b/ext/wayland/wlwindow.h
+index 6e16ab8397..9a1964113c 100644
+--- a/ext/wayland/wlwindow.h
++++ b/ext/wayland/wlwindow.h
+@@ -47,11 +47,17 @@ struct _GstWlWindow
+   struct wl_surface *area_surface;
+   struct wl_surface *area_surface_wrapper;
+   struct wl_subsurface *area_subsurface;
+-  struct wp_viewport *area_viewport;
++  struct wp_viewport *wp_area_viewport;
++#ifdef HAVE_SCALER_PROTOCOL_H
++  struct wl_viewport *wl_area_viewport;
++#endif /* HAVE_SCALER_PROTOCOL_H */
+   struct wl_surface *video_surface;
+   struct wl_surface *video_surface_wrapper;
+   struct wl_subsurface *video_subsurface;
+-  struct wp_viewport *video_viewport;
++  struct wp_viewport *wp_video_viewport;
++#ifdef HAVE_SCALER_PROTOCOL_H
++  struct wl_viewport *wl_video_viewport;
++#endif /* HAVE_SCALER_PROTOCOL_H */
+   struct wl_shell_surface *wl_shell_surface;
+   struct xdg_surface *xdg_surface;
+   struct xdg_toplevel *xdg_toplevel;
+-- 
+2.17.1
+

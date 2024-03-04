@@ -1,0 +1,33 @@
+From b8ad39940c017a5e5240bdf1ec598eff7831f5dd Mon Sep 17 00:00:00 2001
+From: Hongyong Huang <quic_hongyong@quicinc.com>
+Date: Mon, 30 Oct 2023 06:39:16 +0000
+Subject: [PATCH] waylandsink: increase timeout limitation in
+ gst_wl_window_new_toplevel.
+
+- Issue: There is no enough time for xdg surface configuring in stress
+         tests of activate-deactivate example and EIS case. In this
+         case, it will report "xdg_toplevel@17: error 1: Surface has not
+         been configured yet".
+- Fix: Increase timeout limitation in gst_wl_window_new_toplevel.
+
+Signed-off-by: Hongyong Huang <quic_hongyong@quicinc.com>
+---
+ ext/wayland/wlwindow.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/ext/wayland/wlwindow.c b/ext/wayland/wlwindow.c
+index 2e0765f..96919d4 100644
+--- a/ext/wayland/wlwindow.c
++++ b/ext/wayland/wlwindow.c
+@@ -328,7 +328,7 @@ gst_wl_window_new_toplevel (GstWlDisplay * display, const GstVideoInfo * info,
+     wl_display_flush (display->display);
+
+     g_mutex_lock (&window->configure_mutex);
+-    timeout = g_get_monotonic_time () + 100 * G_TIME_SPAN_MILLISECOND;
++    timeout = g_get_monotonic_time () + 200 * G_TIME_SPAN_MILLISECOND;
+     while (!window->configured) {
+       if (!g_cond_wait_until (&window->configure_cond, &window->configure_mutex,
+               timeout)) {
+--
+2.35.7
+

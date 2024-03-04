@@ -1,0 +1,63 @@
+From 3913c754c14f3e0ea3b1908159a42d1376463f71 Mon Sep 17 00:00:00 2001
+From: ppachang <quic_ppachang@quicinc.com>
+Date: Tue, 2 May 2023 14:13:14 +0530
+Subject: [PATCH] videoparser: Add support for protected content caps in
+ h264parse and h265parse
+
+---
+ gst/videoparsers/gsth264parse.c | 9 ++++++++-
+ gst/videoparsers/gsth265parse.c | 9 ++++++++-
+ 2 files changed, 16 insertions(+), 2 deletions(-)
+
+diff --git a/gst/videoparsers/gsth264parse.c b/gst/videoparsers/gsth264parse.c
+index 387cde2..3a04358 100644
+--- a/gst/videoparsers/gsth264parse.c
++++ b/gst/videoparsers/gsth264parse.c
+@@ -88,13 +88,20 @@ enum
+ static GstStaticPadTemplate sinktemplate = GST_STATIC_PAD_TEMPLATE ("sink",
+     GST_PAD_SINK,
+     GST_PAD_ALWAYS,
+-    GST_STATIC_CAPS ("video/x-h264"));
++    GST_STATIC_CAPS ("video/x-h264"
++        ";"
++        "application/x-cenc, original-media-type = (string) video/x-h264"));
+ 
+ static GstStaticPadTemplate srctemplate = GST_STATIC_PAD_TEMPLATE ("src",
+     GST_PAD_SRC,
+     GST_PAD_ALWAYS,
+     GST_STATIC_CAPS ("video/x-h264, parsed = (boolean) true, "
+         "stream-format=(string) { avc, avc3, byte-stream }, "
++        "alignment=(string) { au, nal }"
++        ";"
++        "application/x-cenc, original-media-type = (string) video/x-h264, "
++        "parsed = (boolean) true, "
++        "stream-format=(string) { byte-stream }, "
+         "alignment=(string) { au, nal }"));
+ 
+ #define parent_class gst_h264_parse_parent_class
+diff --git a/gst/videoparsers/gsth265parse.c b/gst/videoparsers/gsth265parse.c
+index 2eb902d..adebdfa 100644
+--- a/gst/videoparsers/gsth265parse.c
++++ b/gst/videoparsers/gsth265parse.c
+@@ -81,13 +81,20 @@ enum
+ static GstStaticPadTemplate sinktemplate = GST_STATIC_PAD_TEMPLATE ("sink",
+     GST_PAD_SINK,
+     GST_PAD_ALWAYS,
+-    GST_STATIC_CAPS ("video/x-h265"));
++    GST_STATIC_CAPS ("video/x-h265"
++        ";"
++        "application/x-cenc, original-media-type = (string) video/x-h265"));
+ 
+ static GstStaticPadTemplate srctemplate = GST_STATIC_PAD_TEMPLATE ("src",
+     GST_PAD_SRC,
+     GST_PAD_ALWAYS,
+     GST_STATIC_CAPS ("video/x-h265, parsed = (boolean) true, "
+         "stream-format=(string) { hvc1, hev1, byte-stream }, "
++        "alignment=(string) { au, nal }"
++        ";"
++        "application/x-cenc, original-media-type = (string) video/x-h265, "
++        "parsed = (boolean) true, "
++        "stream-format=(string) { byte-stream }, "
+         "alignment=(string) { au, nal }"));
+ 
+ #define parent_class gst_h265_parse_parent_class

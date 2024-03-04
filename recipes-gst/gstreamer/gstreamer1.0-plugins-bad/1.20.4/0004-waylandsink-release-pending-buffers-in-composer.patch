@@ -1,0 +1,176 @@
+From 850241141d677be6b608e3dac595908d6f65c0d8 Mon Sep 17 00:00:00 2001
+From: "Petar G. Georgiev" <petarg@codeaurora.org>
+Date: Fri, 29 Nov 2019 14:56:55 +0200
+Subject: [PATCH] waylandsink: release pending buffers in composer
+
+- Add functionality to forcibly release any pending buffers in the
+  wayland compositor at GST_QUERY_DRAIN, GST_EVENT_FLUSH_START and
+  at GST_STATE_CHANGE_PAUSED_TO_READY.
+- This is needed because some live sources may require all buffers
+  to be returned when transitioning to READY state, some decoders
+  may want them returned when DRAIN query is sent or During FLUSH
+  events buffer must be returned as well.
+
+Signed-off-by: Petar G. Georgiev <quic_petarg@quicinc.com>
+---
+ ext/wayland/gstwaylandsink.c | 42 ++++++++++++++++++++++++++++++++++++
+ ext/wayland/wlbuffer.c       | 24 ++++++++++-----------
+ ext/wayland/wldisplay.c      | 14 ++++++++++++
+ ext/wayland/wldisplay.h      |  2 ++
+ 4 files changed, 70 insertions(+), 12 deletions(-)
+
+diff --git a/ext/wayland/gstwaylandsink.c b/ext/wayland/gstwaylandsink.c
+index 7674397..0de9821 100644
+--- a/ext/wayland/gstwaylandsink.c
++++ b/ext/wayland/gstwaylandsink.c
+@@ -105,6 +105,8 @@ static GstCaps *gst_wayland_sink_get_caps (GstBaseSink * bsink,
+ static gboolean gst_wayland_sink_set_caps (GstBaseSink * bsink, GstCaps * caps);
+ static gboolean
+ gst_wayland_sink_propose_allocation (GstBaseSink * bsink, GstQuery * query);
++static gboolean gst_wayland_sink_query (GstBaseSink * bsink, GstQuery * query);
++static gboolean gst_wayland_sink_event (GstBaseSink * bsink, GstEvent * event);
+ static GstFlowReturn gst_wayland_sink_show_frame (GstVideoSink * bsink,
+     GstBuffer * buffer);
+ 
+@@ -205,6 +207,8 @@ gst_wayland_sink_class_init (GstWaylandSinkClass * klass)
+   gstbasesink_class->set_caps = GST_DEBUG_FUNCPTR (gst_wayland_sink_set_caps);
+   gstbasesink_class->propose_allocation =
+       GST_DEBUG_FUNCPTR (gst_wayland_sink_propose_allocation);
++  gstbasesink_class->query = GST_DEBUG_FUNCPTR (gst_wayland_sink_query);
++  gstbasesink_class->event = GST_DEBUG_FUNCPTR (gst_wayland_sink_event);
+ 
+   gstvideosink_class->show_frame =
+       GST_DEBUG_FUNCPTR (gst_wayland_sink_show_frame);
+@@ -519,6 +523,8 @@ gst_wayland_sink_change_state (GstElement * element, GstStateChange transition)
+       }
+       sink->redraw_pending = FALSE;
+       g_mutex_unlock (&sink->render_lock);
++
++      gst_wl_display_force_release_buffers (sink->display);
+       break;
+     case GST_STATE_CHANGE_READY_TO_NULL:
+       g_mutex_lock (&sink->display_lock);
+@@ -769,6 +775,42 @@ gst_wayland_sink_propose_allocation (GstBaseSink * bsink, GstQuery * query)
+   return TRUE;
+ }
+ 
++static gboolean
++gst_wayland_sink_query (GstBaseSink * bsink, GstQuery * query)
++{
++  GstWaylandSink *sink = GST_WAYLAND_SINK (bsink);
++  gboolean ret = TRUE;
++
++  /* First execute the parent class query function. */
++  ret = GST_BASE_SINK_CLASS (parent_class)->query (bsink, query);
++
++  /* Force release any buffers in the wayland composer. */
++  if (GST_QUERY_TYPE (query) == GST_QUERY_DRAIN) {
++    gst_buffer_replace (&sink->last_buffer, NULL);
++    gst_wl_display_force_release_buffers (sink->display);
++  }
++
++  return ret;
++}
++
++static gboolean
++gst_wayland_sink_event (GstBaseSink * bsink, GstEvent * event)
++{
++  GstWaylandSink *sink = GST_WAYLAND_SINK (bsink);
++  gboolean ret = TRUE;
++
++  ret = GST_BASE_SINK_CLASS (parent_class)->event (bsink, gst_event_ref (event));
++
++  /* Force release any buffers in the wayland composer. */
++  if (GST_EVENT_TYPE (event) == GST_EVENT_FLUSH_START) {
++    gst_buffer_replace (&sink->last_buffer, NULL);
++    gst_wl_display_force_release_buffers (sink->display);
++  }
++
++  gst_event_unref (event);
++  return ret;
++}
++
+ static void
+ frame_redraw_callback (void *data, struct wl_callback *callback, uint32_t time)
+ {
+diff --git a/ext/wayland/wlbuffer.c b/ext/wayland/wlbuffer.c
+index caab58d..1e11c5a 100644
+--- a/ext/wayland/wlbuffer.c
++++ b/ext/wayland/wlbuffer.c
+@@ -203,8 +203,19 @@ gst_buffer_get_wl_buffer (GstWlDisplay * display, GstBuffer * gstbuffer)
+ void
+ gst_wl_buffer_force_release_and_unref (GstBuffer * buf, GstWlBuffer * self)
+ {
++  /* Finalize this GstWlBuffer early.
++   * We need to stop using any wayland resources and disconnect from
++   * the display. The GstWlBuffer stays alive, though, to avoid race
++   * conditions with the GstBuffer being destroyed from another thread.
++   * The last reference is either owned by the GstBuffer or by us and
++   * it will be released at the end of this function. */
++  GST_TRACE_OBJECT (self, "finalizing early");
++  wl_buffer_destroy (self->wlbuffer);
++  self->wlbuffer = NULL;
++  self->display = NULL;
++
+   /* Force a buffer release.
+-   * At this point, the GstWlDisplay has killed its event loop,
++   * At this point, wl_buffer has been disconnected from display,
+    * so we don't need to worry about buffer_release() being called
+    * at the same time from the event loop thread */
+   if (self->used_by_compositor) {
+@@ -214,17 +225,6 @@ gst_wl_buffer_force_release_and_unref (GstBuffer * buf, GstWlBuffer * self)
+     gst_buffer_unref (self->current_gstbuffer);
+   }
+ 
+-  /* Finalize this GstWlBuffer early.
+-   * This method has been called as a result of the display shutting down,
+-   * so we need to stop using any wayland resources and disconnect from
+-   * the display. The GstWlBuffer stays alive, though, to avoid race
+-   * conditions with the GstBuffer being destroyed from another thread.
+-   * The last reference is either owned by the GstBuffer or by us and
+-   * it will be released at the end of this function. */
+-  GST_TRACE_OBJECT (self, "finalizing early");
+-  wl_buffer_destroy (self->wlbuffer);
+-  self->wlbuffer = NULL;
+-  self->display = NULL;
+   self->current_gstbuffer = NULL;
+ 
+   /* remove the reference that the caller (GstWlDisplay) owns */
+diff --git a/ext/wayland/wldisplay.c b/ext/wayland/wldisplay.c
+index 27e071a..3e3d816 100644
+--- a/ext/wayland/wldisplay.c
++++ b/ext/wayland/wldisplay.c
+@@ -492,3 +492,17 @@ gst_wl_display_unregister_buffer (GstWlDisplay * self, gpointer gstmem)
+     g_hash_table_remove (self->buffers, gstmem);
+   g_mutex_unlock (&self->buffers_mutex);
+ }
++
++void
++gst_wl_display_force_release_buffers (GstWlDisplay * self)
++{
++  /* to avoid buffers being unregistered from another thread
++   * at the same time, take their ownership */
++  g_mutex_lock (&self->buffers_mutex);
++  g_hash_table_foreach (self->buffers, gst_wl_ref_wl_buffer, NULL);
++  g_mutex_unlock (&self->buffers_mutex);
++
++  g_hash_table_foreach (self->buffers,
++      (GHFunc) gst_wl_buffer_force_release_and_unref, NULL);
++  g_hash_table_remove_all (self->buffers);
++}
+diff --git a/ext/wayland/wldisplay.h b/ext/wayland/wldisplay.h
+index bdd00ba..f988ebb 100644
+--- a/ext/wayland/wldisplay.h
++++ b/ext/wayland/wldisplay.h
+@@ -104,6 +104,8 @@ void gst_wl_display_register_buffer (GstWlDisplay * self, gpointer gstmem,
+ void gst_wl_display_unregister_buffer (GstWlDisplay * self, gpointer gstmem);
+ gpointer gst_wl_display_lookup_buffer (GstWlDisplay * self, gpointer gstmem);
+ 
++void gst_wl_display_force_release_buffers (GstWlDisplay * self);
++
+ gboolean gst_wl_display_check_format_for_shm (GstWlDisplay * display,
+     GstVideoFormat format);
+ gboolean gst_wl_display_check_format_for_dmabuf (GstWlDisplay * display,
+-- 
+2.25.1
+

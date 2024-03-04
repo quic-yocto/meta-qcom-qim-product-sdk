@@ -1,0 +1,33 @@
+From eaf2c62f7ca568174b1e406e2021ce4276c06b75 Mon Sep 17 00:00:00 2001
+From: "Petar G. Georgiev" <quic_petarg@quicinc.com>
+Date: Thu, 18 May 2023 11:38:14 +0300
+Subject: [PATCH] waylandsink: support gap buffers
+
+When a GAP buffer is received for rendering, simply drop it.
+
+Signed-off-by: Petar G. Georgiev <quic_petarg@quicinc.com>
+---
+ ext/wayland/gstwaylandsink.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/ext/wayland/gstwaylandsink.c b/ext/wayland/gstwaylandsink.c
+index 4019686357..d242a6fc72 100644
+--- a/ext/wayland/gstwaylandsink.c
++++ b/ext/wayland/gstwaylandsink.c
+@@ -901,6 +901,13 @@ gst_wayland_sink_show_frame (GstVideoSink * vsink, GstBuffer * buffer)
+     }
+   }
+ 
++  /* GAP buffer, nothing further to do */
++  if (gst_buffer_get_size (buffer) == 0 &&
++      GST_BUFFER_FLAG_IS_SET (buffer, GST_BUFFER_FLAG_GAP)) {
++    GST_LOG_OBJECT (sink, "buffer %p dropped (gap in the stream)", buffer);
++    goto done;
++  }
++
+   /* drop buffers until we get a frame callback */
+   if (sink->redraw_pending) {
+     GST_LOG_OBJECT (sink, "buffer %p dropped (redraw pending)", buffer);
+-- 
+2.17.1
+

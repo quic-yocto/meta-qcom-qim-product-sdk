@@ -1,0 +1,120 @@
+From 8204f4c605ed457ce171e931a93ecb9bfd546856 Mon Sep 17 00:00:00 2001
+From: Hongyong Huang <quic_hongyong@quicinc.com>
+Date: Wed, 19 Jul 2023 12:15:49 +0800
+Subject: [PATCH] v4l2: Add support for fd memory import
+
+Signed-off-by: Hongyong Huang <quic_hongyong@quicinc.com>
+---
+ sys/v4l2/gstv4l2allocator.c  | 12 ++++++++----
+ sys/v4l2/gstv4l2bufferpool.c |  2 +-
+ sys/v4l2/gstv4l2object.c     |  2 +-
+ sys/v4l2/gstv4l2src.c        | 31 +++++++++++++++++++++++++++++++
+ 4 files changed, 41 insertions(+), 6 deletions(-)
+
+diff --git a/sys/v4l2/gstv4l2allocator.c b/sys/v4l2/gstv4l2allocator.c
+index 48d1bb8..ae32389 100644
+--- a/sys/v4l2/gstv4l2allocator.c
++++ b/sys/v4l2/gstv4l2allocator.c
+@@ -1102,16 +1102,20 @@ gst_v4l2_allocator_import_dmabuf (GstV4l2Allocator * allocator,
+     goto n_mem_missmatch;
+
+   for (i = 0; i < group->n_mem; i++) {
+-    gint dmafd;
++    gint dmafd = -1;
+     gsize size, offset, maxsize;
+
+-    if (!gst_is_dmabuf_memory (dma_mem[i]))
++    if (gst_is_dmabuf_memory (dma_mem[i]))
++      dmafd = gst_dmabuf_memory_get_fd (dma_mem[i]);
++
++    if (gst_is_fd_memory (dma_mem[i]))
++      dmafd = gst_fd_memory_get_fd (dma_mem[i]);
++
++    if (dmafd == -1)
+       goto not_dmabuf;
+
+     size = gst_memory_get_sizes (dma_mem[i], &offset, &maxsize);
+
+-    dmafd = gst_dmabuf_memory_get_fd (dma_mem[i]);
+-
+     GST_LOG_OBJECT (allocator, "[%i] imported DMABUF as fd %i plane %d",
+         group->buffer.index, dmafd, i);
+
+diff --git a/sys/v4l2/gstv4l2bufferpool.c b/sys/v4l2/gstv4l2bufferpool.c
+index d85f036..4de1da4 100644
+--- a/sys/v4l2/gstv4l2bufferpool.c
++++ b/sys/v4l2/gstv4l2bufferpool.c
+@@ -92,7 +92,7 @@ gst_v4l2_is_buffer_valid (GstBuffer * buffer, GstV4l2MemoryGroup ** out_group)
+   if (GST_BUFFER_FLAG_IS_SET (buffer, GST_BUFFER_FLAG_TAG_MEMORY))
+     goto done;
+
+-  if (gst_is_dmabuf_memory (mem))
++  if (gst_is_dmabuf_memory (mem) || gst_is_fd_memory (mem))
+     mem = gst_mini_object_get_qdata (GST_MINI_OBJECT (mem),
+         GST_V4L2_MEMORY_QUARK);
+
+diff --git a/sys/v4l2/gstv4l2object.c b/sys/v4l2/gstv4l2object.c
+index ee60540..eaefa2a 100644
+--- a/sys/v4l2/gstv4l2object.c
++++ b/sys/v4l2/gstv4l2object.c
+@@ -5311,7 +5311,7 @@ gst_v4l2_object_try_import (GstV4l2Object * obj, GstBuffer * buffer)
+     for (i = 0; i < n_mem; i++) {
+       GstMemory *mem = gst_buffer_peek_memory (buffer, i);
+
+-      if (!gst_is_dmabuf_memory (mem)) {
++      if (!gst_is_dmabuf_memory (mem) && !gst_is_fd_memory (mem)) {
+         GST_DEBUG_OBJECT (obj->dbg_obj, "Cannot import non-DMABuf memory.");
+         return FALSE;
+       }
+diff --git a/sys/v4l2/gstv4l2src.c b/sys/v4l2/gstv4l2src.c
+index f100407..40e3171 100644
+--- a/sys/v4l2/gstv4l2src.c
++++ b/sys/v4l2/gstv4l2src.c
+@@ -63,6 +63,9 @@
+
+ #include "gst/gst-i18n-plugin.h"
+
++#include <sys/ioctl.h>
++#include <linux/dma-buf.h>
++
+ GST_DEBUG_CATEGORY (v4l2src_debug);
+ #define GST_CAT_DEFAULT v4l2src_debug
+
+@@ -1166,6 +1169,34 @@ retry:
+   GST_BUFFER_TIMESTAMP (*buf) = timestamp;
+   GST_BUFFER_DURATION (*buf) = duration;
+
++  // Flush output cache of fd memory
++  if (gst_is_fd_memory (gst_buffer_peek_memory (*buf, 0))) {
++    struct dma_buf_sync bufsync;
++    gint fd = gst_fd_memory_get_fd (gst_buffer_peek_memory (*buf, 0));
++
++    bufsync.flags = DMA_BUF_SYNC_START | DMA_BUF_SYNC_RW;
++    if (ioctl (fd, DMA_BUF_IOCTL_SYNC, &bufsync) != 0)
++      GST_WARNING_OBJECT (v4l2src, "DMA IOCTL SYNC START failed!");
++
++    bufsync.flags = DMA_BUF_SYNC_END | DMA_BUF_SYNC_RW;
++    if (ioctl (fd, DMA_BUF_IOCTL_SYNC, &bufsync) != 0)
++      GST_WARNING_OBJECT (v4l2src, "DMA IOCTL SYNC START failed!");
++  }
++
++  // Flush output cache of dmabuf memory
++  if (gst_is_dmabuf_memory (gst_buffer_peek_memory (*buf, 0))) {
++    struct dma_buf_sync bufsync;
++    gint fd = gst_dmabuf_memory_get_fd (gst_buffer_peek_memory (*buf, 0));
++
++    bufsync.flags = DMA_BUF_SYNC_START | DMA_BUF_SYNC_RW;
++    if (ioctl (fd, DMA_BUF_IOCTL_SYNC, &bufsync) != 0)
++      GST_WARNING_OBJECT (v4l2src, "DMA IOCTL SYNC START failed!");
++
++    bufsync.flags = DMA_BUF_SYNC_END | DMA_BUF_SYNC_RW;
++    if (ioctl (fd, DMA_BUF_IOCTL_SYNC, &bufsync) != 0)
++      GST_WARNING_OBJECT (v4l2src, "DMA IOCTL SYNC START failed!");
++  }
++
+   return ret;
+
+   /* ERROR */
+--
+2.25.1
+
