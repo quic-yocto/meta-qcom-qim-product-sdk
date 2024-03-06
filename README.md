@@ -40,14 +40,21 @@ Run the following commands to set up Qualcomm Package Manager 3 https://qpm.qual
 mkdir -p <DEV_PKG_LOCATION>
 cd <DEV_PKG_LOCATION>
 sudo dpkg -i <downloaded Deb file>
+## Example `sudo dpkg -i QualcommPackageManager3.3.0.92.4.Linux-x86.deb`
 qpm-cli --login
 ```
 
-## Sync Qualcomm Intelligent Multimedia Product SDK
+## Sync Yocto Project BSP plus Qualcomm Intelligent Multimedia Product SDK
 
 ```shell
-mkdir <QIMP SDK workspace>
-cd <QIMP SDK workspace>
+mkdir [release]
+cd [release]
+repo init -u https://github.com/quic-yocto/qcom-manifest -b [branch name] -m [release manifest]
+repo sync -c -j8
+```
+## Examples
+To download the `qcom-6.6.13-QLI.1.0-Ver.1.2_qim-product-sdk-1.0.xml` release
+```shell
 repo init -u https://github.com/quic-yocto/qcom-manifest -b qcom-linux-kirkstone -m qcom-6.6.13-QLI.1.0-Ver.1.2_qim-product-sdk-1.0.xml
 repo sync -c -j8
 ```
@@ -57,6 +64,18 @@ repo sync -c -j8
 ```shell
 export SHELL=/bin/bash
 MACHINE=qcm6490 DISTRO=qcom-wayland source setup-environment
+```
+##Add meta-qcom-qim-product-sdk layer in build-qcom-wayland/conf/bblayers.conf file
+```shell
+vi conf/bblayers.conf
+```
+```shell
+EXTRALAYERS ?= " \
+  ${WORKSPACE}/layers/meta-qcom-qim-product-sdk \
+"
+```
+##Run the following command to compile
+```shell
 bitbake qcom-multimedia-image
 bitbake qim-product-sdk
 ```
@@ -69,32 +88,6 @@ QIM Product SDK output path: ${QIMP SDK workspace}/build-qcom-wayland/tmp-glibc/
 ## Flash image
 
 To flash the generated build, see the [Flash software](https://docs.qualcomm.com/bundle/resource/topics/80-70014-251/flash_rb3_software_0.html)
-
-## How to install Qualcomm Intelligent Multimedia Product SDK
-
-```shell
-adb root
-adb shell mount -o remount,rw /
-adb push qim-prod-sdk-rel_1.0.0.tar.gz /tmp/
-adb shell
-/bin/bash
-cd /tmp/
-tar -zxvf qim-prod-sdk-rel_1.0.0.tar.gz
-cd qim-prod-sdk
-chmod 777 install.sh uninstall.sh
-sh install.sh
-```
-
-## How to uninstall Qualcomm Intelligent Multimedia Product SDK
-
-```shell
-adb root
-adb shell mount -o remount,rw /
-adb shell
-/bin/bash
-cd qim-prod-sdk
-sh uninstall.sh
-```
 
 # Reference
 
