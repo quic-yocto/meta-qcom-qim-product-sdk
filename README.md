@@ -54,7 +54,7 @@ repo sync -c -j8
 ```
 ## Examples
 
-To download the `qcom-6.6.13-QLI.1.0-Ver.1.3_qim-product-sdk-1.0.xml` release
+To download the `qcom-6.6.13-QLI.1.0-Ver.1.3_qim-product-sdk-1.1.xml` release
 ```shell
 repo init -u https://github.com/quic-yocto/qcom-manifest -b qcom-linux-kirkstone -m qcom-6.6.13-QLI.1.0-Ver.1.3_qim-product-sdk-1.1.xml
 repo sync -c -j8
@@ -65,17 +65,17 @@ repo sync -c -j8
 export SHELL=/bin/bash
 MACHINE=qcm6490 DISTRO=qcom-wayland source setup-environment
 ```
-###Add meta-qcom-qim-product-sdk layer in build-qcom-wayland/conf/bblayers.conf file
+Add meta-qcom-qim-product-sdk layer in build-qcom-wayland/conf/bblayers.conf file
 ```shell
 vi conf/bblayers.conf
 ```
 `meta-qcom-qim-product-sdk`must be added in the same order as shown in the following code snippet:
-'
+```shell
 EXTRALAYERS ?= " \
   ${WORKSPACE}/layers/meta-qcom-qim-product-sdk \
 "
-'
-###Run the following command to compile
+```
+Run the following command to compile
 ```shell
 bitbake qcom-multimedia-image
 bitbake qim-product-sdk
