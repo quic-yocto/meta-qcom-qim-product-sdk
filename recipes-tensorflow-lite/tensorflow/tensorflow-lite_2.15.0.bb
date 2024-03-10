@@ -58,7 +58,9 @@ EXTRA_OECMAKE += "\
     -DTFLITE_ENABLE_HEXAGON=OFF \
     "
 
-PACKAGECONFIG[gpu] = " -DTFLITE_ENABLE_GPU=true ,,adreno,adreno"
+PACKAGECONFIG ?= "gpu"
+
+PACKAGECONFIG[gpu] = " -DTFLITE_ENABLE_GPU=ON ,  -DTFLITE_ENABLE_GPU=OFF, adreno vulkan-headers, adreno"
 
 FILES_${PN} = "${libdir}/lib*.so ${bindir}/*"
 FILES_${PN}-dev += "${includedir}"
@@ -80,7 +82,7 @@ do_install:append() {
     do
         install -d ${D}${includedir}/$HPATH
         cd ${S}/$HPATH
-        cp --parents $(find . -name "*.h*") ${D}${includedir}/$HPATH
+        cp --parents $(find . \( ! -name "*hexagon*" -name "*.h*" \)) ${D}${includedir}/$HPATH
     done
 
     install -d ${D}${libdir}

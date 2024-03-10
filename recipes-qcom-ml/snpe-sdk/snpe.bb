@@ -9,11 +9,12 @@ DESCRIPTION      = "Snapdragon Neural Processing Engine SDK"
 SNPE_DIR = "${DL_DIR}/snpe"
 
 do_fetch() {
-    if [ ! -f "/usr/bin/qpm-cli" ]; then
-        echo "QPM is not installed on host machine, Please try after QPM installation!!"
-        exit 1
-    fi
     if [ ! -d ${SNPE_DIR}/lib ]; then
+        if [ ! -f "/usr/bin/qpm-cli" ]; then
+            echo "QPM is not installed on host machine, Please try after QPM installation!!"
+            exit 1
+        fi
+
         mkdir -p ${SNPE_DIR}
         /usr/bin/qpm-cli --license-activate qualcomm_neural_processing_sdk
         yes y | /usr/bin/qpm-cli --extract qualcomm_neural_processing_sdk --version ${SNPE_VERSION} --path ${SNPE_DIR}

@@ -8,7 +8,6 @@ PACKAGE_ARCH = "${MACHINE_ARCH}"
 inherit packagegroup
 
 SRC_URI += "file://install.sh"
-SRC_URI += "file://uninstall.sh"
 
 PACKAGES = "${PN}"
 

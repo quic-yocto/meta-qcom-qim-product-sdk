@@ -11,6 +11,8 @@ SRC_URI:append:qcom = "\
   file://0006-waylandsink-increase-timeout-limitation-in-gst_wl_wi.patch \
 "
 
+DEPENDS:append:qcom = " weston"
+
 do_configure:prepend:qcom() {
   install -d ${STAGING_DIR_HOST}${datadir}/wayland-protocols/stable/gbm-buffer-backend/
   cp ${TMPDIR}/sysroots-components/${TUNE_PKGARCH}/weston/usr/share/libweston-10/protocols/gbm-buffer-backend.xml ${STAGING_DIR_HOST}${datadir}/wayland-protocols/stable/gbm-buffer-backend

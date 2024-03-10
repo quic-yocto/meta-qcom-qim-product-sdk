@@ -19,8 +19,8 @@ do_generate_tflite_sdk[dirs] = "${SSTATE_IN_DIR} ${SSTATE_OUT_DIR}"
 do_generate_tflite_sdk[cleandirs] = "${SSTATE_IN_DIR} ${SSTATE_OUT_DIR}"
 do_generate_tflite_sdk[stamp-extra-info] = "${MACHINE_ARCH}"
 do_generate_tflite_sdk[depends] = " \
-      tensorflow-lite:do_packagedata \
-    "
+    tensorflow-lite:do_packagedata \
+  "
 
 # Add a task to generate Tflite sdk
 do_generate_tflite_sdk () {
@@ -51,7 +51,7 @@ do_generate_tflite_sdk () {
     done
     tar -zcf ${SSTATE_IN_DIR}/${SDK_PN}-dbg_${PV}.tar.gz ./${SDK_PN}/dbg/*
     rm -rf ./${SDK_PN}/dbg
-    for f in `find . -type f \( -name "*-doc_*" -o -name "*-staticdev_*" \)`
+    for f in `find . -type f \( -name "*-doc_*" -o -name "*-staticdev_*" -o -name "*-locale-*" \)`
     do
         rm -rf $f
     done
@@ -60,16 +60,16 @@ do_generate_tflite_sdk () {
 }
 
 def get_pkgs_list(d):
-  import os
-  pkgtype = d.getVar("IMAGE_PKGTYPE", True)
-  deploydir = d.getVar("DEPLOY_DIR", True)
-  pkgslist = []
-  for _, pkgdirs, _ in os.walk(os.path.join(deploydir, pkgtype)):
-    for pkgdir in pkgdirs:
-      for f in os.listdir(os.path.join(deploydir, pkgtype, pkgdir)):
-        if "libgomp-dev" in os.path.basename(f) or "tensorflow-lite" in os.path.basename(f) :
-          pkgslist.append(os.path.join(deploydir, pkgtype, pkgdir, f))
-  return " \\\n ".join(pkgslist)
+    import os
+    pkgtype = d.getVar("IMAGE_PKGTYPE", True)
+    deploydir = d.getVar("DEPLOY_DIR", True)
+    pkgslist = []
+    for _, pkgdirs, _ in os.walk(os.path.join(deploydir, pkgtype)):
+        for pkgdir in pkgdirs:
+            for f in os.listdir(os.path.join(deploydir, pkgtype, pkgdir)):
+                if "libgomp-dev" in os.path.basename(f) or "tensorflow-lite" in os.path.basename(f) :
+                    pkgslist.append(os.path.join(deploydir, pkgtype, pkgdir, f))
+    return " \\\n ".join(pkgslist)
 
 python do_generate_tflite_sdk_setscene() {
     sstate_setscene(d)

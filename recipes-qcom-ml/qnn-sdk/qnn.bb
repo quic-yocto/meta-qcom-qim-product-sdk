@@ -9,11 +9,12 @@ DESCRIPTION      = "Qualcomm Neural Network SDK"
 QNN_DIR = "${DL_DIR}/qnn"
 
 do_fetch() {
-    if [ ! -f "/usr/bin/qpm-cli" ]; then
-        echo "QPM is not installed on host machine, Please try after QPM installation!!"
-        exit 1
-    fi
     if [ ! -d ${QNN_DIR}/lib ]; then
+        if [ ! -f "/usr/bin/qpm-cli" ]; then
+            echo "QPM is not installed on host machine, Please try after QPM installation!!"
+            exit 1
+        fi
+
         mkdir -p ${QNN_DIR}
         /usr/bin/qpm-cli --license-activate qualcomm_ai_engine_direct
         yes y | /usr/bin/qpm-cli --extract qualcomm_ai_engine_direct --version ${QNN_VERSION} --path ${QNN_DIR}
@@ -53,8 +54,6 @@ do_install() {
 
     cp -r ${QNN_DIR}/include/QNN/* ${D}/${includedir}
     chmod -R 0755 ${D}/${includedir}
-    # libCalculator_skel.so is included by SNPE as well so we are removing from QNN
-    # This fix will be present until we get proper resolution from MLG team
     rm -f ${D}/${libdir}/rfsa/adsp/libCalculator_skel.so
 }
 

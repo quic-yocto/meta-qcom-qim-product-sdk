@@ -12,7 +12,7 @@ DEPENDS += "gstreamer1.0-plugins-base"
 DEPENDS += "gstreamer1.0-plugins-qcom-oss-base"
 DEPENDS += "qnn"
 
-SRC_URI += "git://git.codelinaro.org/clo/le/qcom-gstreamer.git;protocol=https;rev=03219e93653a22989c953c7b51fc3b3aab6a136f;branch=imsdk.lnx.2.0.0.r1-rel;subpath=gst-plugin-mlqnn"
+SRC_URI += "git://git.codelinaro.org/clo/le/platform/vendor/qcom-opensource/gst-plugins-qti-oss.git;protocol=https;rev=bae5eb8ce7a6f6e4d81ce09672b26ebdc14e113c;branch=imsdk.lnx.2.0.0.r1-rel;subpath=gst-plugin-mlqnn"
 S = "${WORKDIR}/gst-plugin-mlqnn"
 
 # Install directories.

@@ -6,7 +6,8 @@
 SDK_NAME="TFLITE_SDK"
 
 FOUND_PKGS=""
-PKG_LIST_FILE="$PKG_LIST_DIR/$SDK_NAME.list"
+PKG_LIST_DIR="/opt/qcom/tflite/"
+PKG_LIST_FILE="${PKG_LIST_DIR}/${SDK_NAME}.list"
 
 # check permission for execute this script
 function check_permission() {
@@ -29,35 +30,31 @@ function scan_tflite_packages() {
 function install_tflite_packages() {
     install_command="opkg install --force-reinstall --force-depends --force-overwrite"
 
-    for PKG_FILE in $FOUND_PKGS; do
-        $install_command $PKG_FILE
+    for PKG_FILE in ${FOUND_PKGS}; do
+        ${install_command} ${PKG_FILE}
     done
 
-    if [ ! -d "$PKG_LIST_DIR" ]; then
-        mkdir -p "$PKG_LIST_DIR"
-    fi
+    mkdir -p "${PKG_LIST_DIR}"
 
-    if [ -f "$PKG_LIST_FILE" ]; then
-        rm -f "$PKG_LIST_FILE"
-    fi
+    rm -f "${PKG_LIST_FILE}"
 
-    for pkg in $FOUND_PKGS; do
+    for pkg in ${FOUND_PKGS}; do
         pkg_name=`echo $pkg | awk -F'/' '{print $NF}' | awk -F'_' '{print $1}'`
-        echo $pkg_name >> $PKG_LIST_FILE
+        echo ${pkg_name} >> ${PKG_LIST_FILE}
     done
 }
 
 function main() {
 
     echo ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>"
-    echo ">>> Install scripts for $SDK_NAME"
+    echo ">>> Install scripts for ${SDK_NAME}"
     echo "<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<"
     echo
 
     check_permission
 
-    if [ -f $PKG_LIST_FILE ]; then
-        printf "WARN: $SDK_NAME has installed, "
+    if [ -f ${PKG_LIST_FILE} ]; then
+        printf "WARN: ${SDK_NAME} has installed, "
         while true; do
             read -p "Do you wish to install anyway? (Y/N)" yn
             case $yn in

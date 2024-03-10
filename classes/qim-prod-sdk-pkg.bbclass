@@ -83,16 +83,16 @@ do_generate_qim_prod_sdk () {
 }
 
 def get_pkgs_list(d):
-  import os
-  pkgtype = d.getVar("IMAGE_PKGTYPE", True)
-  deploydir = d.getVar("DEPLOY_DIR", True)
-  pkgslist = []
-  for _, pkgdirs, _ in os.walk(os.path.join(deploydir, pkgtype)):
-    for pkgdir in pkgdirs:
-      for f in os.listdir(os.path.join(deploydir, pkgtype, pkgdir)):
-        if "qnn" in os.path.basename(f) or "snpe" in os.path.basename(f):
-          pkgslist.append(os.path.join(deploydir, pkgtype, pkgdir, f))
-  return " \\\n ".join(pkgslist)
+    import os
+    pkgtype = d.getVar("IMAGE_PKGTYPE", True)
+    deploydir = d.getVar("DEPLOY_DIR", True)
+    pkgslist = []
+    for _, pkgdirs, _ in os.walk(os.path.join(deploydir, pkgtype)):
+        for pkgdir in pkgdirs:
+            for f in os.listdir(os.path.join(deploydir, pkgtype, pkgdir)):
+                if "qnn" in os.path.basename(f) or "snpe" in os.path.basename(f):
+                    pkgslist.append(os.path.join(deploydir, pkgtype, pkgdir, f))
+    return " \\\n ".join(pkgslist)
 
 python do_generate_qim_sdk_setscene() {
     sstate_setscene(d)

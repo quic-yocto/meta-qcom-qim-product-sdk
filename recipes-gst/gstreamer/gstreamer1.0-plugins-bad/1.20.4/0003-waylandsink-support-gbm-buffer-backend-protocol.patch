@@ -1,4 +1,4 @@
-From ebb1d32aea40644b5ad1d327f6da1ecb58213e71 Mon Sep 17 00:00:00 2001
+From a73413d85c1f8220f539cfafaa44115902d54ce9 Mon Sep 17 00:00:00 2001
 From: "Petar G. Georgiev" <quic_petarg@quicinc.com>
 Date: Tue, 7 Mar 2023 17:25:59 +0200
 Subject: [PATCH] waylandsink: support gbm buffer backend protocol
@@ -11,22 +11,24 @@ element responsibility to provide with such buffers
 
 Signed-off-by: Petar G. Georgiev <quic_petarg@quicinc.com>
 Signed-off-by: Shyam Komakula <quic_skomakul@quicinc.com>
+Signed-off-by: Pratik Pachange <quic_ppachang@quicinc.com>
+
 ---
  ext/wayland/gstwaylandsink.c |  46 ++++++++-
  ext/wayland/gstwaylandsink.h |   3 +
  ext/wayland/meson.build      |   8 +-
- ext/wayland/wldisplay.c      |  57 ++++++++++++
+ ext/wayland/wldisplay.c      |  57 +++++++++++
  ext/wayland/wldisplay.h      |  10 ++
- ext/wayland/wlgbmallocator.c | 175 +++++++++++++++++++++++++++++++++++
+ ext/wayland/wlgbmallocator.c | 180 +++++++++++++++++++++++++++++++++++
  ext/wayland/wlgbmallocator.h |  38 ++++++++
- ext/wayland/wlvideoformat.c  |  95 +++++++++++++------
+ ext/wayland/wlvideoformat.c  |  95 ++++++++++++------
  ext/wayland/wlvideoformat.h  |   4 +-
- 9 files changed, 400 insertions(+), 36 deletions(-)
+ 9 files changed, 405 insertions(+), 36 deletions(-)
  create mode 100644 ext/wayland/wlgbmallocator.c
  create mode 100644 ext/wayland/wlgbmallocator.h
 
 diff --git a/ext/wayland/gstwaylandsink.c b/ext/wayland/gstwaylandsink.c
-index 9ab7492..0de9821 100644
+index b9d1c96..7b9b60a 100644
 --- a/ext/wayland/gstwaylandsink.c
 +++ b/ext/wayland/gstwaylandsink.c
 @@ -47,6 +47,7 @@
@@ -56,7 +58,7 @@ index 9ab7492..0de9821 100644
              WL_VIDEO_FORMATS))
      );
  
-@@ -585,7 +588,7 @@ gst_wayland_sink_get_caps (GstBaseSink * bsink, GstCaps * filter)
+@@ -579,7 +582,7 @@ gst_wayland_sink_get_caps (GstBaseSink * bsink, GstCaps * filter)
  
    if (sink->display) {
      GValue shm_list = G_VALUE_INIT, dmabuf_list = G_VALUE_INIT;
@@ -65,7 +67,7 @@ index 9ab7492..0de9821 100644
      GArray *formats;
      gint i;
      guint fmt;
-@@ -593,6 +596,7 @@ gst_wayland_sink_get_caps (GstBaseSink * bsink, GstCaps * filter)
+@@ -587,6 +590,7 @@ gst_wayland_sink_get_caps (GstBaseSink * bsink, GstCaps * filter)
  
      g_value_init (&shm_list, GST_TYPE_LIST);
      g_value_init (&dmabuf_list, GST_TYPE_LIST);
@@ -73,7 +75,7 @@ index 9ab7492..0de9821 100644
  
      /* Add corresponding shm formats */
      formats = sink->display->shm_formats;
-@@ -624,6 +628,17 @@ gst_wayland_sink_get_caps (GstBaseSink * bsink, GstCaps * filter)
+@@ -618,6 +622,17 @@ gst_wayland_sink_get_caps (GstBaseSink * bsink, GstCaps * filter)
      gst_structure_take_value (gst_caps_get_structure (caps, 1), "format",
          &dmabuf_list);
  
@@ -91,7 +93,7 @@ index 9ab7492..0de9821 100644
      GST_DEBUG_OBJECT (sink, "display caps: %" GST_PTR_FORMAT, caps);
    }
  
-@@ -669,7 +684,8 @@ static gboolean
+@@ -663,7 +678,8 @@ static gboolean
  gst_wayland_sink_set_caps (GstBaseSink * bsink, GstCaps * caps)
  {
    GstWaylandSink *sink;
@@ -101,7 +103,7 @@ index 9ab7492..0de9821 100644
    GstVideoFormat format;
  
    sink = GST_WAYLAND_SINK (bsink);
-@@ -691,15 +707,31 @@ gst_wayland_sink_set_caps (GstBaseSink * bsink, GstCaps * caps)
+@@ -685,15 +701,31 @@ gst_wayland_sink_set_caps (GstBaseSink * bsink, GstCaps * caps)
    use_dmabuf = gst_caps_features_contains (gst_caps_get_features (caps, 0),
        GST_CAPS_FEATURE_MEMORY_DMABUF);
  
@@ -133,7 +135,7 @@ index 9ab7492..0de9821 100644
  
    return TRUE;
  
-@@ -907,7 +939,7 @@ gst_wayland_sink_show_frame (GstVideoSink * vsink, GstBuffer * buffer)
+@@ -865,7 +897,7 @@ gst_wayland_sink_show_frame (GstVideoSink * vsink, GstBuffer * buffer)
        "display, creating it", buffer);
  
    format = GST_VIDEO_INFO_FORMAT (&sink->video_info);
@@ -142,7 +144,7 @@ index 9ab7492..0de9821 100644
      guint i, nb_dmabuf = 0;
  
      for (i = 0; i < gst_buffer_n_memory (buffer); i++)
-@@ -917,6 +949,10 @@ gst_wayland_sink_show_frame (GstVideoSink * vsink, GstBuffer * buffer)
+@@ -875,6 +907,10 @@ gst_wayland_sink_show_frame (GstVideoSink * vsink, GstBuffer * buffer)
      if (nb_dmabuf && (nb_dmabuf == gst_buffer_n_memory (buffer)))
        wbuf = gst_wl_linux_dmabuf_construct_wl_buffer (buffer, sink->display,
            &sink->video_info);
@@ -204,7 +206,7 @@ index 0ec0199..3a0bc5a 100644
          install_dir : plugins_install_dir,
      )
 diff --git a/ext/wayland/wldisplay.c b/ext/wayland/wldisplay.c
-index c0fa400..3e3d816 100644
+index 0e62642..27e071a 100644
 --- a/ext/wayland/wldisplay.c
 +++ b/ext/wayland/wldisplay.c
 @@ -27,6 +27,8 @@
@@ -321,7 +323,7 @@ index c0fa400..3e3d816 100644
      /* If wl_surface and wl_display are passed via GstContext
       * wl_shell, xdg_shell and zwp_fullscreen_shell are not used.
 diff --git a/ext/wayland/wldisplay.h b/ext/wayland/wldisplay.h
-index 14b685d..f988ebb 100644
+index 9c82e17..bdd00ba 100644
 --- a/ext/wayland/wldisplay.h
 +++ b/ext/wayland/wldisplay.h
 @@ -23,10 +23,12 @@
@@ -358,7 +360,7 @@ index 14b685d..f988ebb 100644
    GMutex buffers_mutex;
    GHashTable *buffers;
    gboolean shutting_down;
-@@ -102,6 +110,8 @@ gboolean gst_wl_display_check_format_for_shm (GstWlDisplay * display,
+@@ -100,6 +108,8 @@ gboolean gst_wl_display_check_format_for_shm (GstWlDisplay * display,
      GstVideoFormat format);
  gboolean gst_wl_display_check_format_for_dmabuf (GstWlDisplay * display,
      GstVideoFormat format);
@@ -369,10 +371,10 @@ index 14b685d..f988ebb 100644
  
 diff --git a/ext/wayland/wlgbmallocator.c b/ext/wayland/wlgbmallocator.c
 new file mode 100644
-index 0000000..323ac51
+index 0000000..fd612fc
 --- /dev/null
 +++ b/ext/wayland/wlgbmallocator.c
-@@ -0,0 +1,175 @@
+@@ -0,0 +1,180 @@
 +/* GStreamer Wayland video sink
 + *
 + * Copyright (C) 2016 STMicroelectronics SA
@@ -454,7 +456,7 @@ index 0000000..323ac51
 +    GstWlDisplay * display, const GstVideoInfo * info, gboolean isubwc)
 +{
 +  gint fd, metafd, format, flags = 0;
-+  guint width, height;
++  guint width, height, duplicated = 0;
 +  struct gbm_buffer_params *params;
 +
 +  struct gbm_import_fd_data bufinfo;
@@ -544,7 +546,12 @@ index 0000000..323ac51
 +  g_mutex_clear (&gbmdata.lock);
 +  g_cond_clear (&gbmdata.cond);
 +
-+  gbm_bo_destroy (bo);
++#ifdef GBM_PERFORM_GET_FD_WITH_NEW
++  gbm_perform (GBM_PERFORM_GET_FD_WITH_NEW, &duplicated);
++#endif
++
++  if (duplicated == 0)
++    gbm_bo_destroy (bo);
 +
 +  return gbmdata.wbuffer;
 +}
@@ -751,6 +758,3 @@ index 331f582..bcf3835 100644
  
  G_END_DECLS
  
--- 
-2.25.1
-
