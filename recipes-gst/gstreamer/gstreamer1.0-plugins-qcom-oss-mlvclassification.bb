@@ -13,7 +13,7 @@ DEPENDS += "gstreamer1.0-plugins-qcom-oss-base"
 DEPENDS += "cairo"
 
 FILESPATH =+ "${WORKSPACE}/gst-plugins-qti-oss/:"
-SRC_URI += "git://git.codelinaro.org/clo/le/platform/vendor/qcom-opensource/gst-plugins-qti-oss.git;protocol=https;rev=bae5eb8ce7a6f6e4d81ce09672b26ebdc14e113c;branch=imsdk.lnx.2.0.0.r1-rel;subpath=gst-plugin-mlvclassification"
+SRC_URI += "git://git.codelinaro.org/clo/le/platform/vendor/qcom-opensource/gst-plugins-qti-oss.git;protocol=https;rev=d6ba214079c94a53cf82eb441ab450931f903a10;branch=imsdk.lnx.2.0.0.r1-rel;subpath=gst-plugin-mlvclassification"
 S = "${WORKDIR}/gst-plugin-mlvclassification"
 
 # Install directories.

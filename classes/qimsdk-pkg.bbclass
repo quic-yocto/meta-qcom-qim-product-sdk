@@ -97,6 +97,11 @@ do_generate_qim_sdk () {
     do
         rm -rf $f
     done
+    for f in `find . -type f \( -name "*-locale-*" -o -name "*-src_*" \)`
+    do
+        rm -rf $f
+    done
+
     tar -zcf ${SSTATE_IN_DIR}/${SDK_PN}-rel_${PV}.tar.gz ./${SDK_PN}/*
     rm -rf ${TMP_SSTATE_IN_DIR}
 }

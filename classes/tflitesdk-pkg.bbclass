@@ -18,9 +18,7 @@ do_generate_tflite_sdk[sstate-outputdirs] = "${SSTATE_OUT_DIR}"
 do_generate_tflite_sdk[dirs] = "${SSTATE_IN_DIR} ${SSTATE_OUT_DIR}"
 do_generate_tflite_sdk[cleandirs] = "${SSTATE_IN_DIR} ${SSTATE_OUT_DIR}"
 do_generate_tflite_sdk[stamp-extra-info] = "${MACHINE_ARCH}"
-do_generate_tflite_sdk[depends] = " \
-    tensorflow-lite:do_packagedata \
-  "
+do_generate_tflite_sdk[depends] = "tensorflow-lite:do_package_write_ipk"
 
 # Add a task to generate Tflite sdk
 do_generate_tflite_sdk () {

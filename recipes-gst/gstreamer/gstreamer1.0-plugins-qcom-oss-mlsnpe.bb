@@ -14,7 +14,7 @@ DEPENDS += "snpe"
 
 do_configure[depends] += "${@bb.utils.contains('PACKAGE_CLASSES', 'package_ipk', 'snpe:do_package_write_ipk', 'snpe:do_package_write_deb', d)}"
 
-SRC_URI += "git://git.codelinaro.org/clo/le/platform/vendor/qcom-opensource/gst-plugins-qti-oss.git;protocol=https;rev=bae5eb8ce7a6f6e4d81ce09672b26ebdc14e113c;branch=imsdk.lnx.2.0.0.r1-rel;subpath=gst-plugin-mlsnpe"
+SRC_URI += "git://git.codelinaro.org/clo/le/platform/vendor/qcom-opensource/gst-plugins-qti-oss.git;protocol=https;rev=d6ba214079c94a53cf82eb441ab450931f903a10;branch=imsdk.lnx.2.0.0.r1-rel;subpath=gst-plugin-mlsnpe"
 S = "${WORKDIR}/gst-plugin-mlsnpe"
 
 # Install directories.
