@@ -27,45 +27,54 @@ The Qualcomm Intelligent Multimedia Product SDK consist of :
 
 
 
-# How to sync and build the Qualcomm Intelligent Multimedia Product SDK
-
-## Host Setup
-
-Refer to https://github.com/quic-yocto/qcom-manifest/blob/qcom-linux-kirkstone/README.md setup the host environment.
-
 ## Prerequisites
 
-Run the following commands to set up Qualcomm Package Manager 3 https://qpm.qualcomm.com/:
+Run the following commands to set up Qualcomm Package Manager:
 ```shell
-mkdir -p <DEV_PKG_LOCATION>
-cd <DEV_PKG_LOCATION>
-sudo dpkg -i <downloaded Deb file>
-## Example `sudo dpkg -i QualcommPackageManager3.3.0.92.4.Linux-x86.deb`
+sudo apt install curl
+curl -L https://softwarecenter.qualcomm.com/api/download/software/qsc/linux/latest.deb -o qsc_installer.deb
+sudo dpkg -i qsc_installer.deb
 qpm-cli --login
 ```
 
-## Sync Yocto Project BSP plus Qualcomm Intelligent Multimedia Product SDK
+# How to sync and build the Qualcomm Intelligent Multimedia Product SDK
+
+## Host Setup and Download the Yocto Project BSP
+
+Refer to https://github.com/quic-yocto/qcom-manifest/blob/qcom-linux-kirkstone/README.md setup the host environment and download Yocto Project BSP.
 
 ```shell
 mkdir [release]
 cd [release]
 repo init -u https://github.com/quic-yocto/qcom-manifest -b [branch name] -m [release manifest]
-repo sync -c -j8
+repo sync
 ```
+
 ## Examples
 
-To download the `qcom-6.6.17-QLI.1.0-Ver.1.3_qim-product-sdk-1.1.xml` release
+To download the `qcom-6.6.17-QLI.1.0-Ver.1.3` release
+
 ```shell
-repo init -u https://github.com/quic-yocto/qcom-manifest -b qcom-linux-kirkstone -m qcom-6.6.17-QLI.1.0-Ver.1.3_qim-product-sdk-1.1.xml
-repo sync -c -j8
+repo init -u https://github.com/quic-yocto/qcom-manifest -b qcom-linux-kirkstone -m qcom-6.6.17-QLI.1.0-Ver.1.3.xml 
+repo sync
 ```
 
-To download the `qcom-6.6.13-QLI.1.0-Ver.1.3_qim-product-sdk-1.1.xml` release
+## Run below command to download "meta-qcom-qim-product-sdk" layer in [release] directory where you have downloaded Yocto Project BSP.
+
 ```shell
-repo init -u https://github.com/quic-yocto/qcom-manifest -b qcom-linux-kirkstone -m qcom-6.6.13-QLI.1.0-Ver.1.3_qim-product-sdk-1.1.xml
-repo sync -c -j8
+cd [release]
+git clone https://github.com/quic-yocto/meta-qcom-qim-product-sdk -b [meta-qcom-qim-product-sdk release tag] layers/meta-qcom-qim-product-sdk
 ```
-## Build Qualcomm Intelligent Multimedia Product SDK
+Note: Find the latest "meta-qcom-qim-product-sdk" layer release tag names at https://github.com/quic-yocto/meta-qcom-qim-product-sdk/tags
+
+## Examples
+
+To download the `qcom-6.6.17-QLI.1.0-Ver.1.3_qim-product-sdk-1.1` release tag
+```shell
+git clone https://github.com/quic-yocto/meta-qcom-qim-product-sdk -b qcom-6.6.17-QLI.1.0-Ver.1.3_qim-product-sdk-1.1 layers/meta-qcom-qim-product-sdk 
+```
+
+## Build Yocto Project BSP plus Qualcomm Intelligent Multimedia Product SDK
 
 ```shell
 export SHELL=/bin/bash
@@ -73,20 +82,38 @@ export EXTRALAYERS="meta-qcom-qim-product-sdk"
 MACHINE=qcm6490 DISTRO=qcom-wayland source setup-environment
 ```
 
-Run the following command to compile
+Run the following command to compile and generate flashable image with Yocto Project BSP plus QIM Product SDK layers
 ```shell
 bitbake qcom-multimedia-image
-bitbake qim-product-sdk
 ```
-Image output path: ${QIMP SDK workspace}/build-qcom-wayland/tmp-glibc/deploy/images/qcm6490/qcom-multimedia-image.
+Image output path: $[release]/build-qcom-wayland/tmp-glibc/deploy/images/qcm6490/qcom-multimedia-image.
 
-QIM Product SDK output path: ${QIMP SDK workspace}/build-qcom-wayland/tmp-glibc/deploy/qim_prod_sdk_artifacts.
+## To generate QIM Product SDK artifacts 
 
-# How to install and uninstall the Qualcomm Product SDK
+```shell
+bitbake qim-product-sdk    
+```
+QIM Product SDK output path: $[release]/build-qcom-wayland/tmp-glibc/deploy/qim_prod_sdk_artifacts.
 
-## Flash image
+# Flash image
 
 To flash the generated build, see the [Flash software](https://docs.qualcomm.com/bundle/resource/topics/80-70014-251/flash_rb3_software_0.html)
+
+# Generate Standard SDK and Extensible SDK for Standalone Application Development
+
+	To start Developer’s application development journey, Yocto project offering two different SDK’s (Standard SDK and extensible SDK) with including cross-development tool chains, libraries, headers, and symbols specific to the image to empower the developers. The Standard SDK is suitable for straightforward cross-compilation tasks, while the eSDK extends the capabilities to more complex workflows, making it a valuable choice for developers who need additional flexibility and functionality. To generate Standard SDK and eSDK for qcom-multimedia-image, please use following commands.
+
+Standard SDK:
+```shell
+bitbake -c do_populate_sdk qcom-multimedia-image
+```
+Standard SDK output path : [release]/build-qcom-wayland/tmp-glibc/deploy/sdk/qcom-wayland-x86_64-qcom-multimedia-image-armv8-2a-qcm6490-toolchain-1.0.sh
+
+Extensible SDK:
+```shell
+bitbake -c do_populate_sdk_ext qcom-multimedia-image
+```
+Extensible SDK output path : [release]/build-qcom-wayland/tmp-glibc/deploy/sdk/qcom-wayland-x86_64-qcom-multimedia-image-armv8-2a-qcm6490-toolchain-ext-1.0.sh
 
 # Reference
 
