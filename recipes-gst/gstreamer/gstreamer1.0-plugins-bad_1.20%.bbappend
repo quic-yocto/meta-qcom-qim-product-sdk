@@ -1,4 +1,4 @@
-FILESEXTRAPATHS:prepend:qcom := "${THISDIR}/gstreamer1.0-plugins-bad/1.20.4:"
+FILESEXTRAPATHS:prepend:qcom := "${THISDIR}/gstreamer1.0-plugins-bad/1.20:"
 
 SRC_URI:append:qcom = "\
   file://0001-waylandsink-support-position-and-dimensions.patch \

@@ -11,7 +11,7 @@ DEPENDS := "gstreamer1.0"
 DEPENDS += "gstreamer1.0-plugins-base"
 DEPENDS += "gstreamer1.0-plugins-qcom-oss-base"
 
-SRC_URI += "git://git.codelinaro.org/clo/le/platform/vendor/qcom-opensource/gst-plugins-qti-oss.git;protocol=https;rev=d6ba214079c94a53cf82eb441ab450931f903a10;branch=imsdk.lnx.2.0.0.r1-rel;subpath=gst-plugin-vcomposer"
+SRC_URI += "git://git.codelinaro.org/clo/le/platform/vendor/qcom-opensource/gst-plugins-qti-oss.git;protocol=https;rev=517c6e0f680061674edced287e84166e3ab684b0;branch=imsdk.lnx.2.0.0.r1-rel;subpath=gst-plugin-vcomposer"
 S = "${WORKDIR}/gst-plugin-vcomposer"
 
 # Install directries.

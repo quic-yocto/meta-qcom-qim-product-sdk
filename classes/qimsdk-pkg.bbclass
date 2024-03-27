@@ -93,7 +93,7 @@ do_generate_qim_sdk () {
     done
     tar -zcf ${SSTATE_IN_DIR}/${SDK_PN}-dbg_${PV}.tar.gz ./${SDK_PN}/dbg/*
     rm -rf ./${SDK_PN}/dbg
-    for f in `find . -type f \( -name "*-doc_*" -o -name "*-staticdev_*" -o -name "*-locale-*" \)`
+    for f in `find . -type f \( -name "*-doc_*" -o -name "*-staticdev_*" \)`
     do
         rm -rf $f
     done

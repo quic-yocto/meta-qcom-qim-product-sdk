@@ -1,0 +1,96 @@
+From c0fb3c4b41de43f0eff323caeeed865215f2a595 Mon Sep 17 00:00:00 2001
+From: iraj <quic_iraj@quicinc.com>
+Date: Wed, 6 Mar 2024 19:52:11 +0530
+Subject: [PATCH] v4l2: Handle srccaps and GAP buffer
+
+- Handle GAP buffer in encoder
+For GAP buffers, encoder errors out and crashes. Add handling for such buffers.
+
+- Prefer acquired caps over downstream caps in decoder
+When caps acquired from driver is subset of final caps (intersection of
+driver-acquired, downstream-suggested and srcpad template caps), use the acquired
+caps for negotiation instead of final caps in dec_negotiate.
+This ensures we preserve correct colorimetry, which might be incorrect after caps
+fixation process.
+
+---
+ sys/v4l2/gstv4l2videodec.c | 24 ++++++++++++++----------
+ sys/v4l2/gstv4l2videoenc.c |  3 +++
+ 2 files changed, 17 insertions(+), 10 deletions(-)
+
+diff --git a/sys/v4l2/gstv4l2videodec.c b/sys/v4l2/gstv4l2videodec.c
+index ee481f4..fedc879 100644
+--- a/sys/v4l2/gstv4l2videodec.c
++++ b/sys/v4l2/gstv4l2videodec.c
+@@ -440,7 +440,7 @@ gst_v4l2_video_dec_negotiate (GstVideoDecoder * decoder)
+   GstV4l2Error error = GST_V4L2_ERROR_INIT;
+   GstVideoInfo info;
+   GstVideoCodecState *output_state;
+-  GstCaps *acquired_caps, *available_caps, *caps, *filter;
++  GstCaps *acquired_caps, *fixation_caps, *available_caps, *caps, *filter;
+   GstStructure *st;
+   GstBufferPool *cpool;
+   GstCapsFeatures *features;
+@@ -503,17 +503,17 @@ gst_v4l2_video_dec_negotiate (GstVideoDecoder * decoder)
+   /* Create caps from the acquired format, remove the format field */
+   acquired_caps = gst_video_info_to_caps (&info);
+   GST_DEBUG_OBJECT (self, "Acquired caps: %" GST_PTR_FORMAT, acquired_caps);
+-  st = gst_caps_get_structure (acquired_caps, 0);
+ 
+   if (info.finfo->format == GST_VIDEO_FORMAT_NV12_10LE32) {
+-    features = gst_caps_features_new("memory:GBM", NULL);
+-    gst_caps_set_features(acquired_caps, 0, features);
+-    gst_structure_remove_fields (st, "colorimetry", "chroma-site", NULL);
+-  } else {
+-    gst_structure_remove_fields (st, "format", "colorimetry", "chroma-site",
+-        NULL);
++    features = gst_caps_features_new ("memory:GBM", NULL);
++    gst_caps_set_features (acquired_caps, 0, features);
+   }
+ 
++  fixation_caps = gst_caps_copy (acquired_caps);
++  st = gst_caps_get_structure (fixation_caps, 0);
++  gst_structure_remove_fields (st, "format", "colorimetry", "chroma-site",
++      NULL);
++
+   /* Probe currently available pixel formats */
+   available_caps = gst_caps_copy (self->probed_srccaps);
+   GST_DEBUG_OBJECT (self, "Available caps: %" GST_PTR_FORMAT, available_caps);
+@@ -522,10 +522,10 @@ gst_v4l2_video_dec_negotiate (GstVideoDecoder * decoder)
+    * with downstream, not coded size. */
+   gst_caps_map_in_place (available_caps, gst_v4l2_video_remove_padding, self);
+ 
+-  filter = gst_caps_intersect_full (available_caps, acquired_caps,
++  filter = gst_caps_intersect_full (available_caps, fixation_caps,
+       GST_CAPS_INTERSECT_FIRST);
+   GST_DEBUG_OBJECT (self, "Filtered caps: %" GST_PTR_FORMAT, filter);
+-  gst_caps_unref (acquired_caps);
++  gst_caps_unref (fixation_caps);
+   gst_caps_unref (available_caps);
+   caps = gst_pad_peer_query_caps (decoder->srcpad, filter);
+   gst_caps_unref (filter);
+@@ -536,6 +536,10 @@ gst_v4l2_video_dec_negotiate (GstVideoDecoder * decoder)
+     goto not_negotiated;
+   }
+ 
++  if (gst_caps_is_subset (acquired_caps, caps))
++    gst_caps_replace (&caps, acquired_caps);
++  gst_caps_unref (acquired_caps);
++
+   /* Fixate pixel format */
+   caps = gst_caps_fixate (caps);
+ 
+diff --git a/sys/v4l2/gstv4l2videoenc.c b/sys/v4l2/gstv4l2videoenc.c
+index fc554c0..00443e4 100644
+--- a/sys/v4l2/gstv4l2videoenc.c
++++ b/sys/v4l2/gstv4l2videoenc.c
+@@ -800,6 +800,9 @@ gst_v4l2_video_enc_handle_frame (GstVideoEncoder * encoder,
+   if (G_UNLIKELY (!g_atomic_int_get (&self->active)))
+     goto flushing;
+ 
++  if (GST_BUFFER_FLAG_IS_SET (frame->input_buffer, GST_BUFFER_FLAG_GAP))
++    goto drop;
++
+   task_state = gst_pad_get_task_state (GST_VIDEO_ENCODER_SRC_PAD (self));
+   if (task_state == GST_TASK_STOPPED || task_state == GST_TASK_PAUSED) {
+     GstBufferPool *pool = gst_v4l2_object_get_buffer_pool (self->v4l2output);
