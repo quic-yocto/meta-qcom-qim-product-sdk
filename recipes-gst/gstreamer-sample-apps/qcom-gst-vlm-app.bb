@@ -8,26 +8,24 @@ LIC_FILES_CHKSUM = "file://${QCOM_COMMON_LICENSE_DIR}${LICENSE};md5=3771d4920bd6
 
 # Dependencies.
 DEPENDS := "gstreamer1.0"
-DEPENDS += "gstreamer1.0-plugins-base"
 DEPENDS += "gstreamer1.0-plugins-bad"
-DEPENDS += "qcom-gst-sample-apps-utils"
-DEPENDS += "qcom-camera-server"
+DEPENDS += "json-glib"
+DEPENDS += "libsoup"
 
 SRCPROJECT = "git://git.codelinaro.org/clo/le/platform/vendor/qcom-opensource/gst-plugins-qti-oss.git;protocol=https"
 SRCBRANCH  = "imsdk.lnx.2.0.0.r2-rel"
 SRCREV     = "7afe3eeb1552b3892fb763d3026aa98a4b908826"
 
-SRC_URI = "${SRCPROJECT};branch=${SRCBRANCH};subpath=gst-sample-apps/gst-camera-fd-stream-example"
-S = "${WORKDIR}/gst-camera-fd-stream-example"
-
+SRC_URI = "${SRCPROJECT};branch=${SRCBRANCH};subpath=gst-sample-apps/gst-vlm-app"
+S = "${WORKDIR}/gst-vlm-app"
 
 # Install directries.
 INSTALL_BINDIR := "${bindir}"
 INSTALL_LIBDIR := "${libdir}"
 
 EXTRA_OECMAKE += "-DGST_VERSION_REQUIRED=1.20.7"
-EXTRA_OECMAKE += "-DSYSROOT_INCDIR=${STAGING_INCDIR}"
-EXTRA_OECMAKE += "-DSYSROOT_LIBDIR=${STAGING_LIBDIR}"
+EXTRA_OECMAKE += "-DSYSROOT_INCDIR=${STAGING_INCDIR}"
+EXTRA_OECMAKE += "-DSYSROOT_LIBDIR=${STAGING_LIBDIR}"
 EXTRA_OECMAKE += "-DGST_PLUGINS_QTI_OSS_INSTALL_BINDIR=${INSTALL_BINDIR}"
 EXTRA_OECMAKE += "-DGST_PLUGINS_QTI_OSS_INSTALL_LIBDIR=${INSTALL_LIBDIR}"
 
@@ -36,5 +34,4 @@ FILES:${PN} += "${INSTALL_LIBDIR}"
 
 SOLIBS = ".so*"
 FILES_SOLIBSDEV = ""
-
-EXTRA_OECMAKE:append = " -DENABLE_GST_SAMPLE_APPS_CAMERA=${ENABLE_GST_SAMPLE_APPS_CAMERA}"
+INSANE_SKIP:${PN} = "dev-so"

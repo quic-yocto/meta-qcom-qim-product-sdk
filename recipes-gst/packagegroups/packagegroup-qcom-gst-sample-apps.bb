@@ -59,6 +59,7 @@ RDEPENDS:${PN}:qcom = " \
     qcom-gst-camera-fd-stream-example \
     qcom-gst-ai-event-encoder \
     qcom-gst-rtmp-stream-example \
+    qcom-gst-vlm-app \
    "
 
 RDEPENDS:${PN}:remove:qcs9100 = " \

@@ -42,10 +42,10 @@ repo sync
 
 ## Examples
 
-To download the `qcom-6.6.136-QLI.1.9-Ver.1.1` release
+To download the `qcom-6.6.142-QLI.1.9.1-Ver.1.0` release
 
 ```shell
-repo init -u https://github.com/qualcomm-linux/qcom-manifest -b qcom-linux-scarthgap -m qcom-6.6.136-QLI.1.9-Ver.1.1.xml
+repo init -u https://github.com/qualcomm-linux/qcom-manifest -b qcom-linux-scarthgap -m qcom-6.6.142-QLI.1.9.1-Ver.1.0.xml
 repo sync
 ```
 
@@ -59,9 +59,9 @@ Note: Find the latest meta-qcom-qim-product-sdk release tag names at https://git
 
 ## Examples
 
-To download the `qcom-6.6.136-QLI.1.9-Ver.1.1_qim-product-sdk-2.4.1` release tag
+To download the `qcom-6.6.142-QLI.1.9.1-Ver.1.0_qim-product-sdk-2.5.0` release tag
 ```shell
-git clone https://github.com/qualcomm-linux/meta-qcom-qim-product-sdk -b qcom-6.6.136-QLI.1.9-Ver.1.1_qim-product-sdk-2.4.1 layers/meta-qcom-qim-product-sdk
+git clone https://github.com/qualcomm-linux/meta-qcom-qim-product-sdk -b qcom-6.6.142-QLI.1.9.1-Ver.1.0_qim-product-sdk-2.5.0 layers/meta-qcom-qim-product-sdk
 ```
 
 ## Build Yocto Project BSP plus Qualcomm Intelligent Multimedia SDK

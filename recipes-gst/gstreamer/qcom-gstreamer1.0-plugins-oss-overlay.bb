@@ -18,7 +18,7 @@ DEPENDS += "${@'adrenocl' if d.getVar('GL_PROVIDER') == 'qcom-adreno' else 'open
 
 SRCPROJECT = "git://git.codelinaro.org/clo/le/platform/vendor/qcom-opensource/gst-plugins-qti-oss.git;protocol=https"
 SRCBRANCH  = "imsdk.lnx.2.0.0.r2-rel"
-SRCREV     = "abe79f81950a3015166b5f6aee97f6e41d018322"
+SRCREV     = "7afe3eeb1552b3892fb763d3026aa98a4b908826"
 
 SRC_URI = "${SRCPROJECT};branch=${SRCBRANCH};subpath=gst-plugin-overlay"
 S = "${WORKDIR}/gst-plugin-overlay"
